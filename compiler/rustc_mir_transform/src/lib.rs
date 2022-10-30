@@ -74,6 +74,7 @@ mod nrvo;
 // This pass is public to allow external drivers to perform MIR cleanup
 pub mod remove_false_edges;
 mod remove_noop_landing_pads;
+mod contextual_effects;
 mod remove_storage_markers;
 mod remove_uninit_drops;
 mod remove_unneeded_drops;
@@ -510,6 +511,7 @@ fn run_optimization_passes<'tcx>(tcx: TyCtxt<'tcx>, body: &mut Body<'tcx>) {
             &marker::PhaseChange(MirPhase::Optimized),
             // Dump the end result for testing and debugging purposes.
             &dump_mir::Marker("PreCodegen"),
+            &contextual_effects::ContextualEffects,
         ],
     );
 }
