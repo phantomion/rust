@@ -17,39 +17,41 @@ static mut EFFECT_COUNTER: i64 = 0;
 
 impl ContextualEffects {
     fn generate_contextual_effects(&self, body: &mut Body<'_>) {
-        let mut effects = BlockConstraints::new();
+        let mut constraints = BlockConstraints::new();
         let preorder: Vec<_> = traversal::preorder(body).map(|(bb, _)| bb).collect();
         for bb in preorder {
+            debug!("block {:?}", bb);
             unsafe {
-                effects.current.insert(bb, EFFECT_COUNTER);
+                debug!("effect {}", EFFECT_COUNTER);
+                constraints.current.insert(bb, EFFECT_COUNTER);
             }
-            effects.generate_prior_blocks(bb, body);
+            constraints.generate_prior_blocks(bb, body);
             let mut future = FxHashSet::default();
-            effects.generate_future_blocks(bb, body, &mut future);
-            effects.future.insert(bb, future);
+            constraints.generate_future_blocks(bb, body, &mut future);
+            constraints.future.insert(bb, future);
             unsafe {
                 EFFECT_COUNTER += 1;
             }
         }
-        /* debug!("prior: {:?}", effects.prior);
-        debug!("future: {:?}", effects.future);
-        debug!("current: {:?}", effects.current); */
-        for (bb, effect) in effects.current.clone() {
+        debug!("prior: {:?}", constraints.prior);
+        debug!("future: {:?}", constraints.future);
+        debug!("current: {:?}", constraints.current);
+        for (bb, effect) in constraints.current.clone() {
             debug!("ε_{} {{", effect);
-            effects.visit_basic_block_data(bb, &body[bb]);
+            constraints.visit_basic_block_data(bb, &body[bb]);
         }
-        for (bb, set) in effects.prior.clone() {
+        for (bb, set) in constraints.prior.clone() {
+            let curr_block_effect = constraints.current.get(&bb).unwrap();
             for block in set {
-                let set_block_effect = effects.current.get(&block).unwrap();
-                let curr_block_effect = effects.current.get(&bb).unwrap();
-                debug!("α_{} -> α_{}", curr_block_effect, set_block_effect);
+                let set_block_effect = constraints.current.get(&block).unwrap();
+                debug!("α_{} <- α_{}", set_block_effect, curr_block_effect);
             }
         }
-        for (bb, set) in effects.future.clone() {
+        for (bb, set) in constraints.future.clone() {
+            let curr_block_effect = constraints.current.get(&bb).unwrap();
             for block in set {
-                let set_block_effect = effects.current.get(&block).unwrap();
-                let curr_block_effect = effects.current.get(&bb).unwrap();
-                debug!("ω_{} <- ω_{}", curr_block_effect, set_block_effect);
+                let set_block_effect = constraints.current.get(&block).unwrap();
+                debug!("ω_{} <- ω_{}", set_block_effect, curr_block_effect);
             }
         }
     }
@@ -65,7 +67,9 @@ impl<'tcx> Visitor<'tcx> for BlockConstraints {
         match &terminator.kind {
             TerminatorKind::Call { func, .. } => {
                 let block = self.current.get(&location.block).unwrap();
-                debug!("ε_{} -> ε_{:?}", block, func);
+                debug!("ε_{} <- ε_{:?}", block, func);
+                debug!("α_{} <- α_{:?}", block, func);
+                debug!("ω_{} -> ω_{:?}", block, func);
             }
             TerminatorKind::SwitchInt { .. } => {}
             TerminatorKind::Drop { .. } => {}
