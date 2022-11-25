@@ -26,12 +26,16 @@ impl ContextualEffects {
                 constraints.current.insert(bb, EFFECT_COUNTER);
             }
             constraints.generate_prior_blocks(bb, body);
-            let mut future = FxHashSet::default();
+            /* let mut future = FxHashSet::default();
             constraints.generate_future_blocks(bb, body, &mut future);
-            constraints.future.insert(bb, future);
+            constraints.future.insert(bb, future); */
             unsafe {
                 EFFECT_COUNTER += 1;
             }
+        }
+        let postorder: Vec<_> = traversal::postorder(body).map(|(bb, _)| bb).collect();
+        for bb in postorder {
+            constraints.generate_future_blocks(bb, body);
         }
         // debug!("prior: {:?}", constraints.prior);
         // debug!("future: {:?}", constraints.future);
@@ -120,7 +124,23 @@ impl<'tcx> BlockConstraints {
         }
     }
 
-    fn generate_future_blocks(
+    fn generate_future_blocks(&mut self, bb: BasicBlock, body: &Body<'tcx>) {
+        for target in body[bb].terminator().successors() {
+            let mut future = match self.future.get(&target) {
+                Some(future) => future.clone(),
+                None => FxHashSet::default(),
+            };
+            future.insert(target);
+            match self.future.get_mut(&bb) {
+                Some(future_vec) => future_vec.extend(future),
+                None => {
+                    self.future.insert(bb, future);
+                }
+            };
+        }
+    }
+
+    /* fn generate_future_blocks(
         &mut self,
         bb: BasicBlock,
         body: &Body<'tcx>,
@@ -133,5 +153,5 @@ impl<'tcx> BlockConstraints {
             future.insert(target);
             self.generate_future_blocks(target, body, future);
         }
-    }
+    } */
 }
