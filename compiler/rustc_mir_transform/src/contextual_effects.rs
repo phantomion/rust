@@ -91,7 +91,7 @@ impl<'tcx> Visitor<'tcx> for BlockConstraints {
 
 struct BlockConstraints {
     prior: FxHashMap<BasicBlock, FxHashSet<BasicBlock>>,
-    current: FxHashMap<BasicBlock, i64>,
+    current: FxHashMap<BasicBlock, u64>,
     future: FxHashMap<BasicBlock, FxHashSet<BasicBlock>>,
 }
 
