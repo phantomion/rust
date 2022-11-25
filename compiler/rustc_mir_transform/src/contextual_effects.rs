@@ -8,21 +8,21 @@ pub struct ContextualEffects;
 
 impl<'tcx> MirPass<'tcx> for ContextualEffects {
     fn run_pass(&self, _tcx: TyCtxt<'tcx>, body: &mut Body<'tcx>) {
-        debug!("function {:?}", body.source.instance);
+        info!("function {:?}", body.source.instance);
         self.generate_contextual_effects(body)
     }
 }
 
-static mut EFFECT_COUNTER: i64 = 0;
+static mut EFFECT_COUNTER: u64 = 0;
 
 impl ContextualEffects {
     fn generate_contextual_effects(&self, body: &mut Body<'_>) {
         let mut constraints = BlockConstraints::new();
         let preorder: Vec<_> = traversal::preorder(body).map(|(bb, _)| bb).collect();
         for bb in preorder {
-            debug!("block {:?}", bb);
+            // debug!("block {:?}", bb);
             unsafe {
-                debug!("effect {}", EFFECT_COUNTER);
+                // debug!("effect {}", EFFECT_COUNTER);
                 constraints.current.insert(bb, EFFECT_COUNTER);
             }
             constraints.generate_prior_blocks(bb, body);
@@ -33,25 +33,25 @@ impl ContextualEffects {
                 EFFECT_COUNTER += 1;
             }
         }
-        debug!("prior: {:?}", constraints.prior);
-        debug!("future: {:?}", constraints.future);
-        debug!("current: {:?}", constraints.current);
+        // debug!("prior: {:?}", constraints.prior);
+        // debug!("future: {:?}", constraints.future);
+        // debug!("current: {:?}", constraints.current);
         for (bb, effect) in constraints.current.clone() {
-            debug!("ε_{} {{", effect);
+            info!("ε_{} {{", effect);
             constraints.visit_basic_block_data(bb, &body[bb]);
-        }
-        for (bb, set) in constraints.prior.clone() {
-            let curr_block_effect = constraints.current.get(&bb).unwrap();
-            for block in set {
-                let set_block_effect = constraints.current.get(&block).unwrap();
-                debug!("α_{} <- α_{}", set_block_effect, curr_block_effect);
+
+            if let Some(set) = constraints.prior.get(&bb) {
+                for block in set.into_iter() {
+                    let set_block_effect = constraints.current.get(&block).unwrap();
+                    info!("α_{} <- α_{}", set_block_effect, effect);
+                }
             }
-        }
-        for (bb, set) in constraints.future.clone() {
-            let curr_block_effect = constraints.current.get(&bb).unwrap();
-            for block in set {
-                let set_block_effect = constraints.current.get(&block).unwrap();
-                debug!("ω_{} <- ω_{}", set_block_effect, curr_block_effect);
+
+            if let Some(set) = constraints.future.get(&bb) {
+                for block in set.into_iter() {
+                    let set_block_effect = constraints.current.get(&block).unwrap();
+                    info!("ω_{} <- ω_{}", set_block_effect, effect);
+                }
             }
         }
     }
@@ -59,17 +59,17 @@ impl ContextualEffects {
 
 impl<'tcx> Visitor<'tcx> for BlockConstraints {
     fn visit_statement(&mut self, statement: &Statement<'tcx>, _location: Location) {
-        debug!("{:?}", statement);
+        info!("{:?}", statement);
     }
 
     fn visit_terminator(&mut self, terminator: &Terminator<'tcx>, location: Location) {
-        debug!("}}");
+        info!("}}");
         match &terminator.kind {
             TerminatorKind::Call { func, .. } => {
                 let block = self.current.get(&location.block).unwrap();
-                debug!("ε_{} <- ε_{:?}", block, func);
-                debug!("α_{} <- α_{:?}", block, func);
-                debug!("ω_{} -> ω_{:?}", block, func);
+                info!("ε_{} <- ε_{:?}", block, func);
+                info!("α_{} <- α_{:?}", block, func);
+                info!("ω_{} -> ω_{:?}", block, func);
             }
             TerminatorKind::SwitchInt { .. } => {}
             TerminatorKind::Drop { .. } => {}
